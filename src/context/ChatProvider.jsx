@@ -1,4 +1,8 @@
-// ChatProvider.jsx
+
+// Lógica principal:
+// - Gestionar mensajes, conversaciones y operaciones: guardar, cargar, borrar, nuevo chat.
+// - Persistir en localStorage.
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChatContext } from './ChatContext';
 
@@ -49,11 +53,7 @@ export const ChatProvider = ({ children }) => {
   }, [conversations]);
 
   const messagesEqual = (a = [], b = []) => {
-    try {
-      return JSON.stringify(a) === JSON.stringify(b);
-    } catch {
-      return false;
-    }
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
   };
 
   const saveConversation = () => {
@@ -62,22 +62,13 @@ export const ChatProvider = ({ children }) => {
 
     if (currentConversationId) {
       const existing = conversations.find(c => c.id === currentConversationId);
-      if (existing && messagesEqual(existing.messages, messages)) {
-        return null;
-      }
+      if (existing && messagesEqual(existing.messages, messages)) return null;
     }
 
     const firstUserText = userMessages[0].text.trim();
-    const title = firstUserText
-      ? (firstUserText.slice(0, 60) + (firstUserText.length > 60 ? '...' : ''))
-      : `Chat ${new Date().toLocaleString()}`;
+    const title = firstUserText ? (firstUserText.slice(0, 60) + (firstUserText.length > 60 ? '...' : '')) : `Chat ${new Date().toLocaleString()}`;
 
-    const conv = {
-      id: Date.now(),
-      title,
-      createdAt: new Date().toISOString(),
-      messages
-    };
+    const conv = { id: Date.now(), title, createdAt: new Date().toISOString(), messages };
 
     setConversations(prev => [conv, ...prev]);
     return conv;

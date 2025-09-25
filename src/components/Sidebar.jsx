@@ -1,183 +1,274 @@
 
+/**
+ *
+ * Lógica principal:
+ * - Barra lateral con vista expandida y minimizada.
+ * - En vista minimizada (isOpen = false) SOLO se muestran: los 3 iconos superiores (Chat, Buscar, Nuevo)
+ *   y los 2 botones del footer (Inicia sesión / Regístrate). El historial y el listado NO se muestran.
+ * - Footer fijo abajo y centrado; los iconos minimizados quedan centrados en la parte superior.
+ *
+ * Pasos realizados:
+ * 1. Separé claramente la vista expandida y minimizada usando el ternario principal.
+ * 2. El listado de conversaciones solo se renderiza en modo expandido (isOpen === true).
+ * 3. Ajusté clases Tailwind para centrar los iconos minimizados (`items-center`, `mt-4`) y para centrar el footer (`items-center`).
+ * 4. Mantengo la búsqueda funcional y el resto de handlers para compatibilidad con tu contexto actual.
+ */
 
-import React, { useContext } from "react";
+import React, { useContext, useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import gptLogo from "../assets/chatgpt.svg";
-import addBtn from "../assets/add-30.png";
 import { ChatContext } from "../context/ChatContext";
+import "../app.css";
+import {
+  FiSearch,
+  FiPlus,
+  FiLogIn,
+  FiUserPlus,
+  FiTrash2,
+} from "react-icons/fi";
+import { SiOpenai } from "react-icons/si";
 
 const Sidebar = ({
-    isOpen,
-    toggleSidebar,
-    searchQuery,
-    setSearchQuery,
-    conversations
+  isOpen,
+  toggleSidebar,
+  searchQuery,
+  setSearchQuery,
+  conversations = [],
+  onNewChat,
 }) => {
-    const navigate = useNavigate();
-    const ctx = useContext(ChatContext);
+  const navigate = useNavigate();
+  const ctx = useContext(ChatContext);
 
-    // Crear nuevo chat y navegar al chat principal
-    const handleNewChatAndNavigate = () => {
-        if (ctx?.handleNewChat) ctx.handleNewChat();
-        navigate("/");
-    };
+  const isControlled = typeof setSearchQuery === "function";
+  const [internalQuery, setInternalQuery] = useState(searchQuery || "");
 
-    // Cargar conversación específica y navegar
-    const loadConversationAndNavigate = (id) => {
-        if (ctx?.loadConversation) ctx.loadConversation(id);
-        navigate("/");
-    };
+  useEffect(() => {
+    if (!isControlled) return;
+    setInternalQuery(searchQuery || "");
+  }, [searchQuery, isControlled]);
 
-    // Borrar conversación
-    const deleteConversationAndKeepView = (id) => {
-        if (ctx?.deleteConversation) ctx.deleteConversation(id);
-    };
+  const inputValue = isControlled ? searchQuery || "" : internalQuery;
 
-    // Ejecutar búsqueda por lupa/Enter (normaliza espacios)
-    const performSearch = () => {
-        const q = (searchQuery || "").trim();
-        setSearchQuery(q);
-    };
+  const onSearchChange = (e) => {
+    const val = e.target.value;
+    if (isControlled) setSearchQuery(val);
+    else setInternalQuery(val);
+  };
 
-    // Cambios en el input -> filtrado en vivo
-    const onSearchChange = (e) => {
-        setSearchQuery(e.target.value);
-    };
+  const performSearch = () => {
+    const q = (inputValue || "").trim();
+    if (isControlled) setSearchQuery(q);
+    else setInternalQuery(q);
+  };
 
-    // Enter también dispara performSearch
-    const onSearchKeyDown = (e) => {
-        if (e.key === "Enter") performSearch();
-    };
+  const onSearchKeyDown = (e) => {
+    if (e.key === "Enter") performSearch();
+  };
 
-    // Texto del tooltip según estado abierto/colapsado
-    const tooltipText = isOpen
-        ? "Click para nuevo chat • Ctrl/Cmd + B para ocultar"
-        : "Click para nuevo chat • Ctrl/Cmd + B para mostrar";
+  const filteredConversations = useMemo(() => {
+    const q = (inputValue || "").trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((conv) => {
+      const title = (conv.title || "").toString().toLowerCase();
+      const snippet = (conv.snippet || "").toString().toLowerCase();
+      return title.includes(q) || snippet.includes(q);
+    });
+  }, [conversations, inputValue]);
 
-    // Render
-    return (
-        <aside className={`sideBar ${isOpen ? "open" : "collapsed"}`}>
-            <div className="upperSide">
-                <div className="upperSideTop">
-                    <button
-                        className="logoBtn"
-                        onClick={handleNewChatAndNavigate}
-                        aria-label="Nuevo chat"
-                        title="Nuevo chat"
-                    >
-                        <img src={gptLogo} alt="logo" className="logo" />
-                        <span className="logoTooltip" role="status" aria-hidden="true">{tooltipText}</span>
-                    </button>
+  const handleNewChatAndNavigate = () => {
+    if (!isOpen) {
+      toggleSidebar();
+      return;
+    }
+    if (ctx?.handleNewChat) ctx.handleNewChat();
+    if (typeof onNewChat === "function") onNewChat();
+    navigate("/");
+  };
 
-                    <span className="brand">{isOpen && "ChatGPT"}</span>
+  const loadConversationAndNavigate = (id) => {
+    if (ctx?.loadConversation) ctx.loadConversation(id);
+    navigate("/");
+  };
 
-                    <button
-                        className="collapseBtn"
-                        onClick={toggleSidebar}
-                        aria-pressed={isOpen}
-                        aria-label={isOpen ? "Ocultar barra lateral" : "Mostrar barra lateral"}
-                    >
-                        {isOpen ? "«" : "»"}
-                    </button>
+  const deleteConversationAndKeepView = (id) => {
+    if (ctx?.deleteConversation) ctx.deleteConversation(id);
+  };
+
+  return (
+    <aside
+      className={`fixed left-0 top-0 h-screen z-50 flex flex-col transition-all duration-300 bg-gray-100 text-gray-900 ${
+        isOpen ? "w-64 p-4" : "w-16 p-2"
+      }`}
+      aria-label="Sidebar"
+    >
+      {/* Contenedor principal */}
+      <div className="flex flex-col flex-1 min-h-0">
+        {isOpen ? (
+          // --- VISTA EXPANDIDA ---
+          <>
+            <div className="flex items-center gap-3 p-2">
+              <button
+                className="flex items-center gap-3 bg-transparent border-0 p-0"
+                onClick={handleNewChatAndNavigate}
+                aria-label="Nuevo chat"
+                title="Nuevo chat"
+              >
+                <div className="w-10 h-10 flex items-center justify-center rounded-md bg-white">
+                  <SiOpenai className="w-6 h-6 text-black" />
                 </div>
+                <span className="text-lg font-medium">ChatGPT</span>
+              </button>
 
-                <button className="midBtn" onClick={handleNewChatAndNavigate}>
-                    <img src={addBtn} alt="new chat" className="addBtn" />
-                    {isOpen && <span className="midBtnText">New Chat</span>}
-                </button>
+              <button
+                className="ml-auto bg-transparent border-0 text-xl p-1 rounded hover:bg-gray-200"
+                onClick={toggleSidebar}
+                aria-label="Ocultar barra lateral"
+                title="Ocultar barra"
+              >
+                «
+              </button>
+            </div>
 
-                <div className="searchChatsWrapper" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <input
-                        type="text"
-                        className="searchChats"
-                        placeholder="Buscar en chats..."
-                        value={searchQuery}
-                        onChange={onSearchChange}
-                        onKeyDown={onSearchKeyDown}
-                        aria-label="Buscar chats"
-                    />
-                    <button
-                        type="button"
-                        className="searchBtn"
-                        onClick={performSearch}
-                        aria-label="Buscar"
-                        title="Buscar"
+            <button
+              className="flex items-center gap-3 bg-white text-gray-900 rounded-md p-3 w-full mt-4 hover:bg-gray-200"
+              onClick={handleNewChatAndNavigate}
+              title="Nuevo chat"
+            >
+              <FiPlus className="w-6 h-6" />
+              <span className="font-medium">New Chat</span>
+            </button>
+
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={onSearchChange}
+                onKeyDown={onSearchKeyDown}
+                placeholder="Buscar en chats..."
+                className="flex-1 p-2 rounded-md bg-gray-200 border border-gray-300 text-gray-900 placeholder-gray-600"
+                aria-label="Buscar en chats"
+              />
+              <button
+                onClick={performSearch}
+                className="p-2 rounded-md hover:bg-gray-200"
+                aria-label="Buscar"
+                title="Buscar"
+              >
+                <FiSearch className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 pb-2">
+              <strong className="text-sm text-gray-600">Historial</strong>
+            </div>
+
+            {/* Lista de conversaciones (solo en expandido) */}
+            <div className="mt-2 flex-1 overflow-y-auto space-y-2 sidebar-scroll">
+              {filteredConversations?.length === 0 ? (
+                <div className="text-sm text-gray-500 p-2">No hay conversaciones guardadas</div>
+              ) : (
+                filteredConversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className="flex items-center justify-between p-2 rounded hover:bg-gray-200 cursor-pointer"
+                  >
+                    <div
+                      className="flex-1"
+                      onClick={() => loadConversationAndNavigate(conv.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") loadConversationAndNavigate(conv.id);
+                      }}
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            <circle cx="10.5" cy="10.5" r="5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </button>
-                </div>
-
-                {conversations.length > 0 && (
-                    <div className="history-header">
-                        {isOpen && <strong className="history-title-header">Historial</strong>}
+                      <div className="font-medium truncate">{conv.title}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(conv.createdAt).toLocaleString()}
+                      </div>
                     </div>
-                )}
 
-                <div className="history-list" role="list">
-                    {conversations.length === 0 && isOpen && (
-                        <div className="no-history">No hay conversaciones guardadas</div>
-                    )}
-
-                    {conversations.map((conv) => (
-                        <div className="history-item" key={conv.id} role="listitem">
-                            <div
-                                className="history-item-main"
-                                onClick={() => loadConversationAndNavigate(conv.id)}
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === "Enter") loadConversationAndNavigate(conv.id); }}
-                            >
-                                {isOpen && <div className="history-title">{conv.title}</div>}
-                                {isOpen && <div className="history-meta">{new Date(conv.createdAt).toLocaleString()}</div>}
-                            </div>
-
-                            <div className="history-actions">
-                                <button
-                                    className="three-dots"
-                                    aria-label="Más opciones"
-                                    onClick={() => deleteConversationAndKeepView(conv.id)}
-                                    title="Borrar conversación"
-                                >
-                                    ⋯
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                    <div className="ml-2">
+                      <button
+                        className="text-xl p-1 rounded hover:bg-gray-200"
+                        aria-label="Borrar conversación"
+                        onClick={() => deleteConversationAndKeepView(conv.id)}
+                        title="Borrar conversación"
+                      >
+                        <FiTrash2 className="w-5 h-5 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
+          </>
+        ) : (
+          // --- VISTA MINIMIZADA: SOLO 3 ICONOS SUPERIORES (centrados) ---
+          <div className="flex flex-col items-center gap-4 mt-4">
+            <button
+              onClick={handleNewChatAndNavigate}
+              className="w-12 h-12 flex items-center justify-center bg-white rounded-md hover:bg-gray-200"
+              aria-label="Chat / Expandir barra"
+              title="Abrir chat"
+            >
+              <SiOpenai className="w-6 h-6 text-black" />
+            </button>
 
-            <div className="lowerSide">
-                <div className="authWrapper">
-                    <Link to="/login" className="authBtn loginBtn" aria-label="Inicia sesión">
-                        {isOpen ? (
-                            <span>Inicia sesión</span>
-                        ) : (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                                <polyline points="10 17 15 12 10 7" />
-                                <line x1="15" y1="12" x2="3" y2="12" />
-                            </svg>
-                        )}
-                    </Link>
+            <button
+              onClick={() => {
+                // al hacer click en buscar cuando está minimizado, abrimos la barra para mostrar el input
+                toggleSidebar();
+              }}
+              className="w-12 h-12 flex items-center justify-center bg-white rounded-md hover:bg-gray-200"
+              aria-label="Buscar"
+              title="Buscar"
+            >
+              <FiSearch className="w-6 h-6 text-black" />
+            </button>
 
-                    <Link to="/register" className="authBtn registerBtn" aria-label="Regístrate">
-                        {isOpen ? (
-                            <span>Regístrate</span>
-                        ) : (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="8.5" cy="7" r="4" />
-                                <line x1="20" y1="8" x2="20" y2="14" />
-                                <line x1="17" y1="11" x2="23" y2="11" />
-                            </svg>
-                        )}
-                    </Link>
-                </div>
-            </div>
-        </aside>
-    );
+            <button
+              onClick={() => {
+                // si está minimizada, abrirla y luego crear nuevo chat para UX rápida
+                toggleSidebar();
+                // pequeña espera para que el sidebar abra antes de crear el chat
+                setTimeout(() => {
+                  if (ctx?.handleNewChat) ctx.handleNewChat();
+                  if (typeof onNewChat === "function") onNewChat();
+                  navigate("/");
+                }, 120);
+              }}
+              className="w-12 h-12 flex items-center justify-center bg-teal-600 rounded-md hover:bg-teal-500"
+              aria-label="Nuevo chat"
+              title="Nuevo chat"
+            >
+              <FiPlus className="w-6 h-6 text-white" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER: siempre visible, centrado en minimizado */}
+      <div className="mt-auto flex flex-col items-center gap-2 p-3 border-t border-gray-200 bg-transparent flex-shrink-0">
+        <Link
+          to="/login"
+          className={`flex items-center justify-center gap-2 p-3 rounded ${
+            isOpen ? "w-full bg-white text-gray-900" : "w-12 h-12 bg-white text-gray-900"
+          } hover:bg-gray-200 font-semibold`}
+        >
+          {isOpen ? "Inicia sesión" : <FiLogIn className="w-6 h-6" />}
+        </Link>
+
+        <Link
+          to="/register"
+          className={`flex items-center justify-center gap-2 p-3 rounded ${
+            isOpen
+              ? "w-full bg-gray-900 text-white"
+              : "w-12 h-12 bg-white text-gray-900"
+          } hover:bg-gray-800 font-semibold`}
+        >
+          {isOpen ? "Regístrate" : <FiUserPlus className="w-6 h-6" />}
+        </Link>
+      </div>
+    </aside>
+  );
 };
 
 export default Sidebar;

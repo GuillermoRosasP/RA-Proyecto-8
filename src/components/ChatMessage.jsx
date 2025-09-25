@@ -1,27 +1,26 @@
-import React from 'react';
-import gptImgLogo from '../assets/chatgptLogo.svg';
-import userIcon from '../assets/user-icon.png';
-import Markdown from 'markdown-to-jsx';
+
+import React from "react";
+import { FiMessageSquare, FiUser } from "react-icons/fi";
 
 /**
- * Componente que muestra un mensaje del chat.
- * @param {Object} msg - Objeto con tipo ("bot" o "user") y texto del mensaje.
+ * ChatMessage: muestra un mensaje de bot o user.
+ * Renderiza texto con whitespace preserved (saltos de línea).
  */
-function ChatMessage({ msg }) {
+const ChatMessage = ({ msg }) => {
+  const isBot = msg.type === "bot";
   return (
-    <div className={`chat ${msg.type === "bot" ? "bot" : ""}`}>
-      <img
-        className="chatImg"
-        src={msg.type === "bot" ? gptImgLogo : userIcon}
-        alt=""
-      />
-      {/* Usamos div en lugar de <p> para evitar <p> anidado */}
-      <div className="txt">
-        <Markdown>{msg.text}</Markdown>
+    <div className={`chat ${isBot ? "bot self-start" : "user self-end"} max-w-[85%] flex gap-4`}>
+      <div className="chatImg flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          {isBot ? <FiMessageSquare className="w-5 h-5 text-teal-600" /> : <FiUser className="w-5 h-5 text-gray-600" />}
+        </div>
+      </div>
+
+      <div className="txt whitespace-pre-wrap text-base leading-6">
+        {msg.text}
       </div>
     </div>
   );
-}
+};
 
-// Exportamos el componente para poder importarlo en App.jsx u otros
 export default ChatMessage;
